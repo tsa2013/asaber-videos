@@ -1,0 +1,52 @@
+name: Buscar y descargar fotos de Wikimedia Commons
+# La nube de Claude no llega a Wikimedia. Dos modos:
+#  - <carpeta>/busqueda.txt: "etiqueta|texto a buscar" -> descarga los 6 primeros resultados con licencia libre a <carpeta>/cand/ (640 px) + cand.json
+#  - <carpeta>/lista.txt: "clave|nombre del archivo en Commons" -> <clave>.jpg (1920 px) + meta.json (autor y licencia)
+on:
+  push:
+    branches: [claude/project-thread-b73ci7]
+    paths: ['*-fotos/busqueda.txt', '*-fotos/lista.txt']
+permissions:
+  contents: write
+jobs:
+  fotos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Buscar candidatas
+        run: |
+          UA="ASaberVideos/1.0 (educational YouTube channel; https://github.com/tsa2013/asaber-videos)"
+          API="https://commons.wikimedia.org/w/api.php"
+          for L in *-fotos/busqueda.txt; do
+            [ -f "$L" ] || continue
+            D=$(dirname "$L"); mkdir -p "$D/cand"; echo "[]" > "$D/cand.json"
+            while IFS='|' read -r tag q; do
+              [ -z "$tag" ] && continue
+              j=$(curl -sG -A "$UA" "$API" --data-urlencode "action=query" --data-urlencode "format=json" --data-urlencode "generator=search" --data-urlencode "gsrnamespace=6" --data-urlencode "gsrlimit=12" --data-urlencode "gsrsearch=$q filetype:bitmap" --data-urlencode "prop=imageinfo" --data-urlencode "iiprop=url|extmetadata|size" --data-urlencode "iiurlwidth=640" --data-urlencode "iiextmetadatafilter=LicenseShortName|Artist|LicenseUrl|ImageDescription")
+              echo "$j" | jq -c --arg tag "$tag" '[.query.pages // {} | to_entries[] | .value | select(.imageinfo[0].extmetadata.LicenseShortName.value // "" | test("CC BY|CC0|Public domain|PD"; "i")) | {tag: $tag, idx: .index, file: (.title | sub("^File:"; "")), thumb: .imageinfo[0].thumburl, w: .imageinfo[0].width, h: .imageinfo[0].height, lic: .imageinfo[0].extmetadata.LicenseShortName.value, autor: ((.imageinfo[0].extmetadata.Artist.value // "") | gsub("<[^>]+>"; "") | gsub("^\\s+|\\s+$"; "")), desc: ((.imageinfo[0].extmetadata.ImageDescription.value // "") | gsub("<[^>]+>"; "") | .[0:200])}] | sort_by(.idx) | .[0:6]' > /tmp/r.json
+              n=0
+              for u in $(jq -r '.[].thumb' /tmp/r.json); do n=$((n+1)); curl -sL -A "$UA" -o "$D/cand/${tag}_$n.jpg" "$u"; sleep 1; done
+              jq -s '.[0] + .[1]' "$D/cand.json" /tmp/r.json > /tmp/c.json && mv /tmp/c.json "$D/cand.json"
+            done < "$L"
+          done
+      - name: Descargar elegidas
+        run: |
+          UA="ASaberVideos/1.0 (educational YouTube channel; https://github.com/tsa2013/asaber-videos)"
+          for L in *-fotos/lista.txt; do
+            [ -f "$L" ] || continue
+            D=$(dirname "$L"); echo "{" > "$D/meta.json"; first=1
+            while IFS='|' read -r k f; do
+              [ -z "$k" ] && continue
+              j=$(curl -sG -A "$UA" "https://commons.wikimedia.org/w/api.php" --data-urlencode "action=query" --data-urlencode "format=json" --data-urlencode "titles=File:$f" --data-urlencode "prop=imageinfo" --data-urlencode "iiprop=url|extmetadata" --data-urlencode "iiurlwidth=1920" --data-urlencode "iiextmetadatafilter=LicenseShortName|Artist|LicenseUrl")
+              u=$(echo "$j" | jq -r '.query.pages[].imageinfo[0].thumburl')
+              curl -sL -A "$UA" -o "$D/$k.jpg" "$u"; sleep 1
+              m=$(echo "$j" | jq -c '.query.pages[] | {file: .title, url: .imageinfo[0].descriptionurl, lic: .imageinfo[0].extmetadata.LicenseShortName.value, licurl: .imageinfo[0].extmetadata.LicenseUrl.value, autor: ((.imageinfo[0].extmetadata.Artist.value // "") | gsub("<[^>]+>"; "") | gsub("^\\s+|\\s+$"; ""))}')
+              [ $first = 1 ] || echo "," >> "$D/meta.json"; first=0
+              echo "\"$k\": $m" >> "$D/meta.json"
+            done < "$L"
+            echo "}" >> "$D/meta.json"
+          done
+      - name: Guardar
+        run: |
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add -- *-fotos && git commit -m "Fotos de Wikimedia Commons" && git push || echo "nada nuevo"

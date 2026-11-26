@@ -1,0 +1,11 @@
+dorsey|Jack Dorsey
+meshtastic|Meshtastic
+lora|LoRa radio node T-Beam
+antena|antena telefonía móvil España
+torre|cell tower base station battery
+apagon|apagón 2025 España
+apagon2|2025 Iberian Peninsula blackout
+hongkong|2019 Hong Kong protests smartphones
+nepal|2025 Nepal Gen Z protests
+movil|smartphone crowd street
+bitchat|Bitchat
