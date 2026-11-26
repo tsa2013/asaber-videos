@@ -1,0 +1,34 @@
+name: Descargar fotos de Wikimedia Commons
+# Descarga fotos con licencia libre de Wikimedia Commons (la nube de Claude no llega a Wikimedia).
+# Lista: <carpeta>/lista.txt con "clave|nombre del archivo en Commons". Guarda <clave>.jpg (1920 px) y meta.json (autor y licencia).
+on:
+  push:
+    branches: [claude/project-thread-2r1314]
+    paths: ['*-fotos/lista.txt']
+permissions:
+  contents: write
+jobs:
+  fotos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargar
+        run: |
+          UA="ASaberVideos/1.0 (educational YouTube channel; https://github.com/tsa2013/asaber-videos)"
+          for L in *-fotos/lista.txt; do
+            D=$(dirname "$L"); echo "{" > "$D/meta.json"; first=1
+            while IFS='|' read -r k f; do
+              [ -z "$k" ] && continue
+              j=$(curl -sG -A "$UA" "https://commons.wikimedia.org/w/api.php" --data-urlencode "action=query" --data-urlencode "format=json" --data-urlencode "titles=File:$f" --data-urlencode "prop=imageinfo" --data-urlencode "iiprop=url|extmetadata" --data-urlencode "iiurlwidth=1920" --data-urlencode "iiextmetadatafilter=LicenseShortName|Artist|LicenseUrl")
+              u=$(echo "$j" | jq -r '.query.pages[].imageinfo[0].thumburl')
+              curl -sL -A "$UA" -o "$D/$k.jpg" "$u"; sleep 1
+              m=$(echo "$j" | jq -c '.query.pages[] | {file: .title, url: .imageinfo[0].descriptionurl, lic: .imageinfo[0].extmetadata.LicenseShortName.value, licurl: .imageinfo[0].extmetadata.LicenseUrl.value, autor: ((.imageinfo[0].extmetadata.Artist.value // "") | gsub("<[^>]+>"; "") | gsub("^\\s+|\\s+$"; ""))}')
+              [ $first = 1 ] || echo "," >> "$D/meta.json"; first=0
+              echo "\"$k\": $m" >> "$D/meta.json"
+            done < "$L"
+            echo "}" >> "$D/meta.json"; ls -la "$D"
+          done
+      - name: Guardar
+        run: |
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add -- *-fotos && git commit -m "Fotos de Wikimedia Commons" && git push
