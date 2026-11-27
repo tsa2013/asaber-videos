@@ -1,12 +1,4 @@
-f1_2026|Formula One 2026 car
-test_2026|2026 Formula One pre-season testing
-bahrein_2026|2026 Bahrain Grand Prix Formula One
-verstappen|Max Verstappen 2025
-norris|Lando Norris 2025
-hamilton|Lewis Hamilton Ferrari 2025
-cadillac|Cadillac Formula One team 2026
-audi|Audi Formula One 2026
-motor_f1|Formula One hybrid power unit V6 engine
-salida|Formula One race start grid
-drs|Formula One DRS rear wing open
-tombazis|Nikolas Tombazis
+cadillac|2026 Chinese GP Cadillac
+cadillac2|Cadillac F1 2026 car
+miami|2026 Miami Grand Prix
+tombazis|Tombazis FIA
