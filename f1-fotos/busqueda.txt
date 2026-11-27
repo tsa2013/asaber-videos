@@ -1,4 +1,0 @@
-cadillac|2026 Chinese GP Cadillac
-cadillac2|Cadillac F1 2026 car
-miami|2026 Miami Grand Prix
-tombazis|Tombazis FIA
